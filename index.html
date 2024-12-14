@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Particle Visualizer</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <audio id="audio" src="assets/audio.mp3" controls></audio>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/146/three.min.js"></script>
+    <script>
+        // Set up the scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Particle system
+        const particleCount = 5000;
+        const particles = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 10; // x
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 10; // y
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 10; // z
+            colors[i * 3] = Math.random(); // r
+            colors[i * 3 + 1] = Math.random(); // g
+            colors[i * 3 + 2] = Math.random(); // b
+        }
+        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particleMaterial = new THREE.PointsMaterial({
+            size: 0.1,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+        });
+        const particleSystem = new THREE.Points(particles, particleMaterial);
+        scene.add(particleSystem);
+
+        camera.position.z = 5;
+
+        // Audio setup
+        const audio = document.getElementById('audio');
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const source = audioContext.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            analyser.getByteFrequencyData(dataArray);
+            const avgFrequency = dataArray.reduce((a, b) => a + b) / dataArray.length;
+
+            // Update particles based on audio data
+            const positions = particles.attributes.position.array;
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 10 + avgFrequency / 50; // Modify y based on frequency
+            }
+            particles.attributes.position.needsUpdate = true;
+
+            particleSystem.rotation.y += 0.01; // Rotate the system for effect
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Play audio on user interaction (needed in some browsers)
+        audio.addEventListener('play', () => {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        });
+    </script>
+</body>
+</html>
